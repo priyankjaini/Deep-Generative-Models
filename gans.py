@@ -4,16 +4,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
+import math
+import matplotlib.pyplot as plt
 
 # Data parameters
-data_mean = 4
+dataset_type = 'unimodal'
+data_mean = 3
 data_stddev = 1.25
 
 # model parameters
 g_input_size = 1 # random noise dimension coming into the generator, per output vector
 g_hidden_size = 50 # generator complexity
 g_output_size = 1 # size of generated output vector
-d_input_size = 100 # minibatch size - cardinality of distributions
+d_input_size = 300 # minibatch size - cardinality of distributions
 d_hidden_size = 50 # discriminator complexity
 d_output_size = 1 # single dimension for 'real' vs. 'fake'
 minibatch_size = d_input_size
@@ -21,7 +24,7 @@ minibatch_size = d_input_size
 d_learning_rate = 2e-4
 g_learning_rate = 2e-4
 optim_betas = (0.9,0.999)
-num_epochs = 50000
+num_epochs = 30000
 print_interval = 200
 d_steps = 1 # 'k' steps in the original GAN paper. Can put the discriminator on higher training frequency than generator
 g_steps = 1
@@ -31,12 +34,24 @@ g_steps = 1
 print(["Using data [%s]" % (name)])
 
 ### DATA : Target data and generator input data ###
+'''
+def get_distribution_sampler(dataset_type):
+    if dataset_type == 'unimodal':
+        mu = 4
+        sigma = 1.25
+        return lambda n: torch.Tensor(np.random.normal(mu, sigma, (1,n)))
+    else:
+        w1 = 0.3
+        w2 = 0.1
+        w3 = 1 - (w1+w2)
+'''
 
 def get_distribution_sampler(mu, sigma):
     return lambda n: torch.Tensor(np.random.normal(mu, sigma, (1,n))) # Gaussian
 
 def get_generator_input_sampler():
-    return lambda m, n:torch.rand(m, n) # Uniform-dist data into generator, _NOT_Gaussian
+    #return lambda m, n:torch.rand(m, n) # Uniform-dist data into generator, _NOT_Gaussian
+    return lambda n: torch.Tensor(np.random.normal(0, 1, (n,1)))
 
 class Generator(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
@@ -95,7 +110,8 @@ for epoch in range(num_epochs):
         d_real_error.backward() # compute/store gradients, but don't change params
 
         #  1B: Train D on fake
-        d_gen_input = Variable(gi_sampler(minibatch_size, g_input_size))
+        #d_gen_input = Variable(gi_sampler(minibatch_size, g_input_size))
+        d_gen_input = Variable(gi_sampler(minibatch_size))
         d_fake_data = G(d_gen_input).detach()  # detach to avoid training G on these labels
         d_fake_decision = D(preprocess(d_fake_data.t()))
         d_fake_error = criterion(d_fake_decision, Variable(torch.zeros(1)))  # zeros = fake
@@ -106,7 +122,8 @@ for epoch in range(num_epochs):
         # 2. Train G on D's response (but DO NOT train D on these labels)
         G.zero_grad()
 
-        gen_input = Variable(gi_sampler(minibatch_size, g_input_size))
+        #gen_input = Variable(gi_sampler(minibatch_size, g_input_size))
+        gen_input = Variable(gi_sampler(minibatch_size))
         g_fake_data = G(gen_input)
         dg_fake_decision = D(preprocess(g_fake_data.t()))
         g_error = criterion(dg_fake_decision, Variable(torch.ones(1)))  # we want to fool, so pretend it's all genuine
@@ -121,3 +138,17 @@ for epoch in range(num_epochs):
                                                             extract(g_error)[0],
                                                             stats(extract(d_real_data)),
                                                             stats(extract(d_fake_data))))
+
+estimated_data = G(d_gen_input).detach().numpy()
+original_data = d_real_data.detach().numpy().T
+#print('Original data is: ',original_data)
+#print('Estimated data is: ',estimated_data)
+# plotting the target and estimated distribution
+input_min = np.amin(original_data)
+#print(input_min)
+input_max = np.amax(original_data)
+bins = np.linspace(input_min, input_max, 30)
+plt.hist(estimated_data, bins, alpha=0.5, label='estimated data')
+plt.hist(original_data, bins, alpha=0.5, label='original data')
+plt.legend(loc='upper right')
+plt.show()
