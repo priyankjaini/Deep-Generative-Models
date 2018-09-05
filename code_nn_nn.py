@@ -12,14 +12,14 @@ from generateGMM import *
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # hyperparameters for network architecture
-input_size = 2
+input_size = 1
 hidden_layer1 = 4
 hidden_layer2 = 8
 hidden_layer3 = 4
-output_layer = 2
+output_layer = 1
 
 # hyperparameters for data generation
-n_dims = 2
+n_dims = 1
 n_components = 1
 n_data = 100
 # hyperparameters for network training
@@ -43,10 +43,13 @@ class NeuralNet(nn.Module):
         out = self.transformation(x)
         return out
 #[input_noise, _, _, _, _] = generate_multivariate_GMM(n_data, n_dims, n_components, covariance_type="full", random_seed = np.random.randint(1,500))
-mean = [0,0]
-cov = [[3,0],[0,1]]
-input_noise = np.random.multivariate_normal(mean, cov, n_data)
-#input_noise = np.random.normal(mean, cov, n_data)
+#mean = [0,0]
+#cov = [[3,0],[0,1]]
+#input_noise = np.random.multivariate_normal(mean, cov, n_data)
+mean = 0
+cov = 1
+input_noise = np.random.normal(mean, cov, n_data)
+#print('Input noise is', input_noise)
 #print('Input noise is', input_noise.T)
 input_noise = torch.from_numpy(input_noise).float()
 input_noise = input_noise.reshape(-1, n_dims)
@@ -95,11 +98,11 @@ with torch.no_grad():
     print(output)
     print(data)
     estimated_data = output.detach().numpy()
-'''
+
     # plotting the target and estimated distribution
-    input_min = np.amin(input_noise)
+    input_min = np.amin(original_data)
     #print(input_min)
-    input_max = np.amax(input_noise)
+    input_max = np.amax(original_data)
     #print(input_max)
     #xa = np.linspace(-1, 1, 0.05)
     #sns.kdeplot(original_data)
@@ -114,4 +117,3 @@ with torch.no_grad():
     plt.legend(loc='upper right')
     plt.show()
     #plt.plot(original_data)
-'''
